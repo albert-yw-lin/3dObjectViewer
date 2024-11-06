@@ -4,101 +4,39 @@ import numpy as np
 from dataclasses import dataclass
 from typing import List, Tuple
 import math
+from viewer_2d import BaseRenderer, Object3D, Vertex, Face
 
-@dataclass
-class Vertex:
-    id: int
-    x: float
-    y: float
-    z: float
-
-@dataclass
-class Face:
-    vertex_ids: Tuple[int, int, int]
-    
-    def calculate_normal(self, vertices: List[Vertex]) -> np.ndarray:
-        """Calculate the normal vector of the face"""
-        v1 = vertices[self.vertex_ids[0] - 1]
-        v2 = vertices[self.vertex_ids[1] - 1]
-        v3 = vertices[self.vertex_ids[2] - 1]
-        
-        # Create vectors from vertices
-        vec1 = np.array([v2.x - v1.x, v2.y - v1.y, v2.z - v1.z])
-        vec2 = np.array([v3.x - v1.x, v3.y - v1.y, v3.z - v1.z])
-        
-        # Calculate cross product
-        normal = np.cross(vec1, vec2)
-        
-        # Normalize
-        return normal / (np.linalg.norm(normal)+1e-10)
-
-class Object3D:
-    """Represents a 3D object with vertices and faces"""
-    def __init__(self):
-        self.vertices: List[Vertex] = []
-        self.faces: List[Face] = []
-        
-    def load_from_file(self, filename: str) -> None:
-        """Load 3D object data from a formatted text file"""
-        with open(filename, 'r') as f:
-            # Read number of vertices and faces
-            num_vertices, num_faces = map(int, f.readline().strip().split(','))
-            
-            # Read vertices
-            for _ in range(num_vertices):
-                vid, x, y, z = map(float, f.readline().strip().split(','))
-                self.vertices.append(Vertex(int(vid), x, y, z))
-                
-            # Read faces
-            for _ in range(num_faces):
-                v1, v2, v3 = map(int, f.readline().strip().split(','))
-                self.faces.append(Face((v1, v2, v3)))
-
-class Renderer:
+class Renderer3D(BaseRenderer):
     """Handles 3D to 2D projection and rendering with shading"""
     def __init__(self, canvas: tk.Canvas):
-        self.canvas = canvas
+        super().__init__(canvas)
         self.rotation_x = 0
         self.rotation_y = 0
-        self.scale = 100
         self.last_x = 0
         self.last_y = 0
         
-    def rotate_point(self, point: np.ndarray) -> np.ndarray:
-        """Apply rotation transformations to a point"""
-        # Ensure point is a numpy array
-        point = np.array(point, dtype=float)
+    def transform_point(self, point: np.ndarray) -> np.ndarray:
+        """Apply rotation transformation to a 3D point"""
         
-        # Create rotation matrices with better numerical stability
         rx_matrix = np.array([
             [1.0, 0.0, 0.0],
             [0.0, np.cos(self.rotation_x), -np.sin(self.rotation_x)],
             [0.0, np.sin(self.rotation_x), np.cos(self.rotation_x)]
-        ], dtype=float)
+        ])
         
         ry_matrix = np.array([
             [np.cos(self.rotation_y), 0.0, np.sin(self.rotation_y)],
             [0.0, 1.0, 0.0],
             [-np.sin(self.rotation_y), 0.0, np.cos(self.rotation_y)]
-        ], dtype=float)
+        ])
         
-        # Apply rotations with better precision
         point = rx_matrix @ point
         point = ry_matrix @ point
         
         return point
     
-    def rotate_normal(self, normal: np.ndarray) -> np.ndarray:
-        """Rotate a normal vector using the same transformation as points"""
-        rotated = self.rotate_point(normal)
-        # Ensure normal stays normalized after rotation
-        return rotated / (np.linalg.norm(rotated)+1e-10)
-    
-    def project_point(self, x: float, y: float, z: float) -> Tuple[float, float]:
-        """Project 3D point to 2D screen coordinates"""
-        point = np.array([x, y, z])
-        point = self.rotate_point(point)
-        
+    def project_point(self, point: np.ndarray) -> Tuple[float, float]:
+        """Project 3D point to 2D screen coordinates with depth"""
         screen_x = self.canvas.winfo_width() / 2 + point[0] * self.scale
         screen_y = self.canvas.winfo_height() / 2 - point[1] * self.scale
         
@@ -108,8 +46,6 @@ class Renderer:
         """Calculate face color based on angle with Z-axis"""
         # Calculate angle between normal and z-axis, which in this case is the abs z value of normal
         angle = np.arccos(abs(normal[2]))
-        
-        # Convert angle to degrees
         angle_deg = math.degrees(angle)
         
         # Interpolate between colors #00005F (on edge) and #0000FF (flat)
@@ -120,6 +56,7 @@ class Renderer:
     
     def render(self, obj: Object3D) -> None:
         """Render the 3D object with shaded faces"""
+        self.normalize_scale(obj)
         self.canvas.delete("all")
         
         # Calculate and sort faces by depth
@@ -131,16 +68,18 @@ class Renderer:
             # Calculate normal before rotation
             normal = face.calculate_normal(obj.vertices)
 
-            # Rotate the normal
-            rotated_normal = self.rotate_normal(normal)
-            
+            # Transform vertices and normal
+            transformed_vertices = [self.transform_point(v.vertex_to_point()) for v in vertices]
+            transformed_normal = self.transform_point(normal)
+            transformed_normal = transformed_normal / (np.linalg.norm(transformed_normal) + 1e-10)
+
             # Project vertices
-            projected_vertices = [self.project_point(v.x, v.y, v.z) for v in vertices]
+            projected_vertices = [self.project_point(v) for v in transformed_vertices]
             
             # Calculate center point for depth sorting
-            center_z = sum(v[2] for v in projected_vertices) / 3
+            center_z = sum(v[2] for v in transformed_vertices) / 3
             
-            color = self.calculate_color(rotated_normal)
+            color = self.calculate_color(transformed_normal)
             
             face_data.append((
                 center_z,  # Use rotated center Z for depth sorting
@@ -158,8 +97,9 @@ class Renderer:
             self.canvas.create_polygon(points, fill=color, outline='blue')
         
         # Draw vertices
-        for vertex in obj.vertices:
-            x, y, _ = self.project_point(vertex.x, vertex.y, vertex.z)
+        for v in obj.vertices:
+            point = self.transform_point(v.vertex_to_point())
+            x, y, _ = self.project_point(point)
             # Only draw if we have valid coordinates
             if not math.isnan(x) and not math.isnan(y):
                 self.canvas.create_oval(x-3, y-3, x+3, y+3, fill='blue')
@@ -197,7 +137,7 @@ class Application:
         menubar.add_cascade(label="File", menu=filemenu)
         self.root.config(menu=menubar)
         
-        self.renderer = Renderer(self.canvas)
+        self.renderer = Renderer3D(self.canvas)
         self.object = None
         
         self.canvas.bind("<Button-1>", self.renderer.start_drag)
