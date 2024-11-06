@@ -112,37 +112,46 @@ class BaseRenderer:
         Returns:
             Tuple[float, float, float, float]: minimum x, maximum x, minimum y, maximum y coordinates
         """
-        min_x = min_y = float('inf')
-        max_x = max_y = float('-inf')
+        min_x = min_y = min_z = float('inf')
+        max_x = max_y = max_z = float('-inf')
         
         for vertex in obj.vertices:
-            point = np.array([vertex.x, vertex.y, vertex.z])
+            point = vertex.vertex_to_point()
             min_x = min(min_x, point[0])
             max_x = max(max_x, point[0])
             min_y = min(min_y, point[1])
             max_y = max(max_y, point[1])
+            min_z = min(min_z, point[2])
+            max_z = max(max_z, point[2])
             
-        return min_x, max_x, min_y, max_y
+        return min_x, max_x, min_y, max_y, min_z, max_z
     
-    def normalize_scale(self, obj: Object3D, target_ratio: float = 0.5) -> None:
+    def normalize_scale(self, obj: Object3D, target_ratio: float = 0.5, is_3d: bool = True) -> None:
         """Calculate scale factor to make object fill target ratio of window.
 
         Args:
             obj (Object3D): the 3D object to scale
             target_ratio (float, optional): desired object size relative to window size. Defaults to 0.5.
+            is_3d (bool, optional): determine if consider the scale in z direction into the normalization step
         """
-        min_x, max_x, min_y, max_y = self.calculate_bounding_box(obj)
+        min_x, max_x, min_y, max_y, min_z, max_z = self.calculate_bounding_box(obj)
         
         canvas_width = self.canvas.winfo_width()
         canvas_height = self.canvas.winfo_height()
         
         obj_width = max_x - min_x
         obj_height = max_y - min_y
+        obj_depth = max_z - min_z
         
-        if obj_width > 0 and obj_height > 0:
-            scale_x = (canvas_width * target_ratio) / obj_width
-            scale_y = (canvas_height * target_ratio) / obj_height
-            self.scale = min(scale_x, scale_y)
+        scale_x = (canvas_width * target_ratio) / obj_width
+        scale_y = (canvas_height * target_ratio) / obj_height
+        scale_z = ((canvas_width + canvas_height) * target_ratio) / (2*obj_depth)
+
+        if is_3d: 
+            self.scale = min([scale_x, scale_y, scale_z])
+        else: 
+            self.scale = min([scale_x, scale_y])
+        
     
     def project_point(self, point: np.ndarray) -> Tuple[float, float]:
         """Project 3D point to 2D screen coordinates.
@@ -168,7 +177,7 @@ class Renderer2D(BaseRenderer):
         Args:
             obj (Object3D): the 3D object to render
         """
-        self.normalize_scale(obj)
+        self.normalize_scale(obj, is_3d=False)
         self.canvas.delete("all")
         
         # Draw edges

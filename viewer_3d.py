@@ -91,7 +91,7 @@ class Renderer3D(BaseRenderer):
         Args:
             obj (Object3D): the 3D object to render
         """
-        self.normalize_scale(obj)
+        self.normalize_scale(obj, is_3d=True)
         self.canvas.delete("all")
         
         # Calculate and sort faces by depth
