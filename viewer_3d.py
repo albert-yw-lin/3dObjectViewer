@@ -7,7 +7,14 @@ import math
 from viewer_2d import BaseRenderer, Object3D, Vertex, Face
 
 class Renderer3D(BaseRenderer):
-    """Handles 3D to 2D projection and rendering with shading"""
+    """3D renderer with rotation and shading capabilities.
+
+    Extends BaseRenderer to provide 3D visualization with interactive rotation
+    and face shading based on orientation.
+
+    Args:
+        canvas (tk.Canvas): tkinter canvas widget for drawing
+    """
     def __init__(self, canvas: tk.Canvas):
         super().__init__(canvas)
         self.rotation_x = 0
@@ -16,7 +23,14 @@ class Renderer3D(BaseRenderer):
         self.last_y = 0
         
     def transform_point(self, point: np.ndarray) -> np.ndarray:
-        """Apply rotation transformation to a 3D point"""
+        """Apply rotation transformation to a 3D point.
+
+        Args:
+            point (np.ndarray): original 3D point coordinates
+
+        Returns:
+            np.ndarray: transformed 3D point coordinates
+        """
         
         rx_matrix = np.array([
             [1.0, 0.0, 0.0],
@@ -36,14 +50,28 @@ class Renderer3D(BaseRenderer):
         return point
     
     def project_point(self, point: np.ndarray) -> Tuple[float, float]:
-        """Project 3D point to 2D screen coordinates with depth"""
+        """Project 3D point to 2D screen coordinates with depth information.
+
+        Args:
+            point (np.ndarray): 3D point coordinates
+
+        Returns:
+            Tuple[float, float, float]: x, y screen coordinates and z depth value
+        """
         screen_x = self.canvas.winfo_width() / 2 + point[0] * self.scale
         screen_y = self.canvas.winfo_height() / 2 - point[1] * self.scale
         
         return screen_x, screen_y, point[2]  # Return z for depth sorting
     
     def calculate_color(self, normal: np.ndarray) -> str:
-        """Calculate face color based on angle with Z-axis"""
+        """Calculate face color based on angle with Z-axis.
+
+        Args:
+            normal (np.ndarray): face normal vector
+
+        Returns:
+            str: hex color code based on face orientation
+        """
         # Calculate angle between normal and z-axis, which in this case is the abs z value of normal
         angle = np.arccos(abs(normal[2]))
         angle_deg = math.degrees(angle)
@@ -55,7 +83,14 @@ class Renderer3D(BaseRenderer):
         return f'#{0:02x}{0:02x}{color_value:02x}'
     
     def render(self, obj: Object3D) -> None:
-        """Render the 3D object with shaded faces"""
+        """Render the 3D object with shaded faces and depth sorting.
+
+        Implements the painter's algorithm for visibility and applies shading
+        based on face orientation.
+
+        Args:
+            obj (Object3D): the 3D object to render
+        """
         self.normalize_scale(obj)
         self.canvas.delete("all")
         
@@ -71,7 +106,7 @@ class Renderer3D(BaseRenderer):
             # Transform vertices and normal
             transformed_vertices = [self.transform_point(v.vertex_to_point()) for v in vertices]
             transformed_normal = self.transform_point(normal)
-            transformed_normal = transformed_normal / (np.linalg.norm(transformed_normal) + 1e-10)
+            transformed_normal = transformed_normal / (np.linalg.norm(transformed_normal) + 1e-10) # add a small value to prevent zero devision error
 
             # Project vertices
             projected_vertices = [self.project_point(v) for v in transformed_vertices]
@@ -105,12 +140,23 @@ class Renderer3D(BaseRenderer):
                 self.canvas.create_oval(x-3, y-3, x+3, y+3, fill='blue')
 
     def start_drag(self, event):
-        """Record the starting position of a drag operation"""
+        """Record the starting position of a drag operation.
+
+        Args:
+            event: tkinter mouse event
+        """
         self.last_x = event.x
         self.last_y = event.y
     
     def drag(self, event, obj: Object3D):
-        """Handle mouse drag for rotation"""
+        """Handle mouse drag for rotation.
+
+        Updates rotation angles based on mouse movement and rerenders the object.
+
+        Args:
+            event: tkinter mouse event
+            obj (Object3D): the 3D object to rotate and render
+        """
         dx = event.x - self.last_x
         dy = event.y - self.last_y
         
@@ -154,7 +200,11 @@ class Application:
             self.renderer.render(self.object)
     
     def handle_drag(self, event):
-        """Handle mouse drag events"""
+        """Handle mouse drag events for object rotation.
+
+        Args:
+            event: tkinter mouse event
+        """
         if self.object:
             self.renderer.drag(event, self.object)
     

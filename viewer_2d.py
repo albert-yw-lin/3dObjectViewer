@@ -6,22 +6,44 @@ import numpy as np
 
 @dataclass
 class Vertex:
-    """Represents a vertex with ID and 3D coordinates"""
+    """Represents a vertex with ID and 3D coordinates.
+
+    Args:
+        id (int): vertex id
+        x, y, z (float): the 3d coordinates of the vertex.
+    """
     id: int
     x: float
     y: float
     z: float
 
     def vertex_to_point(self) -> np.ndarray:
+        """Transform the 3D coordinate of the vertex object into a np array.
+
+        Returns:
+            numpy.array [3]: x, y, z values
+        """
         return np.array([self.x, self.y, self.z])
 
 @dataclass
 class Face:
-    """Represents a triangular face with three vertex IDs"""
+    """Represents a triangular face with three vertex IDs
+
+    Args:
+        vertex_ids (Tuple[int, int, int]): ids of the vertex forming the face
+
+    """
     vertex_ids: Tuple[int, int, int]
     
     def calculate_normal(self, vertices: List[Vertex]) -> np.ndarray:
-        """Calculate the normal vector of the face"""
+        """Calculate the normal vector of the face
+        
+        Args:
+            vertices (List[Vertex]): all the vertices in the dataset
+
+        Returns:
+            numpy.array [3]: normalized normal vector of the face
+        """
         v1 = vertices[self.vertex_ids[0] - 1]
         v2 = vertices[self.vertex_ids[1] - 1]
         v3 = vertices[self.vertex_ids[2] - 1]
@@ -34,16 +56,29 @@ class Face:
         normal = np.cross(vec1, vec2)
         
         # Normalize
-        return normal / (np.linalg.norm(normal) + 1e-10)
+        return normal / (np.linalg.norm(normal) + 1e-10) # add a small value to prevent zero devision error
 
 class Object3D:
-    """Represents a 3D object with vertices and faces"""
+    """Represents a 3D object with vertices and faces.
+
+    This class stores the geometric data of a 3D object and provides methods
+    to load the data from a file.
+    """
     def __init__(self):
         self.vertices: List[Vertex] = []
         self.faces: List[Face] = []
         
     def load_from_file(self, filename: str) -> None:
-        """Load 3D object data from a formatted text file"""
+        """Load 3D object data from a formatted text file.
+
+        The file should contain:
+        - First line: number of vertices, number of faces (comma-separated)
+        - Following lines: vertex data (id,x,y,z)
+        - Following lines: face data (v1,v2,v3)
+
+        Args:
+            filename (str): relative path to the data file
+        """
         with open(filename, 'r') as f:
             # Read number of vertices and faces
             num_vertices, num_faces = map(int, f.readline().strip().split(','))
@@ -59,13 +94,24 @@ class Object3D:
                 self.faces.append(Face((v1, v2, v3)))
 
 class BaseRenderer:
-    """Base renderer with common functionality"""
+    """Base renderer class providing common functionality for 2D and 3D rendering.
+
+    Args:
+        canvas (tk.Canvas): tkinter canvas widget for drawing
+    """
     def __init__(self, canvas: tk.Canvas):
         self.canvas = canvas
         self.scale = 100
     
     def calculate_bounding_box(self, obj: Object3D) -> Tuple[float, float, float, float]:
-        """Calculate the bounding box of the object"""
+        """Calculate the bounding box of the 3D object.
+
+        Args:
+            obj (Object3D): the 3D object to analyze
+
+        Returns:
+            Tuple[float, float, float, float]: minimum x, maximum x, minimum y, maximum y coordinates
+        """
         min_x = min_y = float('inf')
         max_x = max_y = float('-inf')
         
@@ -79,7 +125,12 @@ class BaseRenderer:
         return min_x, max_x, min_y, max_y
     
     def normalize_scale(self, obj: Object3D, target_ratio: float = 0.5) -> None:
-        """Calculate scale factor to make object fill target ratio of window"""
+        """Calculate scale factor to make object fill target ratio of window.
+
+        Args:
+            obj (Object3D): the 3D object to scale
+            target_ratio (float, optional): desired object size relative to window size. Defaults to 0.5.
+        """
         min_x, max_x, min_y, max_y = self.calculate_bounding_box(obj)
         
         canvas_width = self.canvas.winfo_width()
@@ -94,15 +145,29 @@ class BaseRenderer:
             self.scale = min(scale_x, scale_y)
     
     def project_point(self, point: np.ndarray) -> Tuple[float, float]:
-        """Project 3D point to 2D screen coordinates"""
+        """Project 3D point to 2D screen coordinates.
+
+        Args:
+            point (np.ndarray): 3D point coordinates
+
+        Returns:
+            Tuple[float, float]: x, y screen coordinates
+        """
         screen_x = self.canvas.winfo_width() / 2 + point[0] * self.scale
         screen_y = self.canvas.winfo_height() / 2 - point[1] * self.scale
         return screen_x, screen_y
 
 class Renderer2D(BaseRenderer):
-    """2D orthographic renderer"""
+    """2D orthographic renderer for displaying 3D objects in wireframe.
+
+    Inherits from BaseRenderer and implements simple 2D projection and rendering.
+    """
     def render(self, obj: Object3D) -> None:
-        """Render the 3D object to the canvas using 2D graphics"""
+        """Render the 3D object to the canvas using 2D wireframe graphics.
+
+        Args:
+            obj (Object3D): the 3D object to render
+        """
         self.normalize_scale(obj)
         self.canvas.delete("all")
         
