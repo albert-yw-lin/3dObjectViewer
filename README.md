@@ -4,17 +4,13 @@ This repository contains a 3D Object Viewer application developed in Python. It 
 
 ## Table of Contents
 1. [Overview](#overview)
-2. [Requirements](#requirements)
-3. [Environment](#environment)
-4. [Usage](#usage)
-5. [File Format](#file-format)
-6. [Code Structure](#code-structure)
+2. [Environment](#environment)
+3. [Usage](#usage)
+4. [File Format](#file-format)
+5. [Code Structure](#code-structure)
 
 ## Overview
 This application reads 3D object data from a text file and displays the object in either a wireframe or shaded mode. The viewer enables users to interact with the object by clicking and dragging to rotate it about the X and Y axes, simulating a 3D perspective view.
-
-## Requirements
-- Libraries specified in `environment.yaml`
 
 ## Environment
    Create a virtual environment with the required dependencies.
